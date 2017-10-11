@@ -1,18 +1,18 @@
 ####################################
 #data parameters
-image_size = 28*28
-image_shape = (28, 28)
+image_size = 32*32
+image_shape = (32, 32)
 
 ####################################
 #network parameters
-nc_netG = 1
+nc_netG = 3
 ndf_netG = 16
 #ngf_netG = 256
 #nz_netG =128
 #ninput_netG = 8*ndf_netG + nz_netG
 
 
-nc_netD = 1
+nc_netD = 3
 ndf_netD = 256
 
 ####################################

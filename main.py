@@ -9,11 +9,11 @@ import torch.optim as optim
 import torchvision.utils as vutils
 import torchvision.models as models
 
-from nets.classifiers import _netD_mnist,_netG_mnist
+from nets.classifiers import _netD_cifar10,_netG_cifar10
 from constants import *
-from utils.utils import accu,TestAcc_dataloader, TestAcc_tensor
+from utils.utils import accu,TestAcc_dataloader, TestAcc_tensor, TestAdvAcc_dataloader
 import models.model_train as model_train
-from dataProcess.read_data import read_MNIST
+from dataProcess.read_data import read_CIFAR10
 import glob
 import copy
 
@@ -21,8 +21,9 @@ import copy
 #torch.cuda.manual_seed(31415926)
 batch_size = 64
 test_batch_size = 1000
-train_data , test_data = read_MNIST(batch_size, test_batch_size)
+train_data , test_data = read_CIFAR10(batch_size, test_batch_size)
 
+'''
 feature_inter_list = []
 label_list = []
 feature_pre = torch.zeros(batch_size,nc_netD,image_shape[0],image_shape[1])
@@ -38,16 +39,14 @@ torch.save((feature_inter_set, labelset), 'inter.pt')
 
 inter_data = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(feature_inter_set, labelset),
     batch_size=64, shuffle=True, drop_last = False)
-
-netD = _netD_mnist()
-netD.cuda()
-netD.load_state_dict(torch.load('netD.pkl'))
-print('Test accuracy of netD: %.3f'%(TestAcc_dataloader(netD,test_data)))
-optimizerD = optim.Adam(netD.parameters(), lr=lr_D, betas=(0.9, 0.999))
-loss_func = nn.CrossEntropyLoss()
+'''
 
 def acquireGradient(netD, dataset1, dataset2, loss_func):
-	res1 = torch.zeros(nc_netD,image_size).cuda()
+	list1 = dict([])
+	list2 = dict([])
+	for name, par in netD.named_parameters():
+		list1[name] = torch.zeros(par.size()).cuda()
+		list2[name] = torch.zeros(par.size()).cuda()
 	num1 = 0
 	for i,data_batch in enumerate(dataset1):
 		feature,label = data_batch
@@ -58,11 +57,12 @@ def acquireGradient(netD, dataset1, dataset2, loss_func):
 			error -= outputs[j][label.data[j]]
 		#error = loss_func(outputs, label)
 		error.backward()
-		res1 += torch.sum(feature.grad.data, 0)
-		num1 += feature.size()[0]
+		for name, par in netD.named_parameters():
+			list1[name] += par.grad.data
+		num1 += 1 
+		
 
-	res2 = torch.zeros(1,28*28).cuda()
-	num2 = 0
+	num2 =0
 	for i,data_batch in enumerate(dataset2):
 		feature,label = data_batch
 		feature,label = Variable(feature.cuda(), requires_grad = True), Variable(label.cuda())
@@ -72,24 +72,45 @@ def acquireGradient(netD, dataset1, dataset2, loss_func):
 			error -= outputs[j][label.data[j]]
 		#error = loss_func(outputs, label)
 		error.backward()
-		res2 += torch.sum(feature.grad.data, 0)
-		num2 += feature.size()[0]
+		for name, par in netD.named_parameters():
+			list2[name] += par.grad.data
+		num2 += 1 
 
-	return (torch.norm(1.0*res1/num1), torch.norm(1.0*res2/num2), torch.norm(1.0*res1/num1 - 1.0*res2/num2))
+	res1 = 0.0
+	res2 = 0.0
+	res = 0.0
+	num_term = 0
+	for name in list1.keys():
+		if 'weight'  in name:
+			res1 += torch.norm(list1[name]/num1,2)
+			res2 += torch.norm(list2[name]/num2,2)
+			res += torch.dot(list1[name].view(-1)/(num1*res1), list2[name].view(-1)/(num2*res2))
+			num_term +=1
+	return (res1, res2, res/num_term)
 
 
-netD_cp = copy.deepcopy(netD)
-print(acquireGradient(netD_cp, train_data, test_data, loss_func))
+
+netD = _netD_cifar10()
+netD.cuda()
+netD.load_state_dict(torch.load('netD.pkl'))
+#print('Test accuracy of netD: %.3f'%(TestAcc_dataloader(netD,test_data)))
+loss_func = nn.CrossEntropyLoss()
+#netD_cp = copy.deepcopy(netD)
+netD.train()
+print(acquireGradient(netD, train_data, test_data, loss_func))
+
+netD = _netD_cifar10()
+netD.cuda()
+optimizerD = optim.SGD(netD.parameters(), lr=0.02, weight_decay = 0.01)
+
+
+
+
 
 for epoch in range(epoch_num):
 	running_loss_D = .0
 	running_acc_D = .0
 	for i, data_batch in enumerate(train_data):
-		#netD_cp = copy.deepcopy(netD)
-		#gradient_tr[epoch][i] = acquireGradient(netD_cp, train_data, loss_func)
-		#gradient_t[epoch][i] = acquireGradient(netD_cp, test_data, loss_func)
-		#gradient_inter[epoch][i] = acquireGradient(netD_cp, inter_data, loss_func)
-
 		netD.train()
 
 		netD.zero_grad()
@@ -104,7 +125,7 @@ for epoch in range(epoch_num):
 		optimizerD.step()
 
 		running_loss_D += errorD_real
-		running_acc_D += accu(outputs, label)
+		running_acc_D += accu(outputs, label)/batch_size
 
 		if i%50==49:
 			print('[%d/%d][%d/%d] Adv perf: %.4f / %.4f'
@@ -114,16 +135,19 @@ for epoch in range(epoch_num):
 			running_acc_D = .0
 		if epoch%5==2 and i%500==0:
 			vutils.save_image(feature_adv.data, './adv_image/adv_image_epoch_%03d_%03d.png' %(epoch,i), normalize = True)
+	if epoch % 10 ==9:
+				optimizerD.param_groups[0]['lr'] /= 2.0
 	if epoch % 3 == 0:
-		dataset_adv = torch.load('./adv_exam/adv_gradient_FGSM_step15.pt')
+		dataset_adv = torch.load('./adv_exam/adv_gradient_FGSM_step1.pt')
 		netD.eval()
 		test_acc = TestAcc_dataloader(netD, test_data)
 		test_adv_acc = TestAcc_tensor(netD, dataset_adv)
 		print('[%d/%d]Test accu: %.3f' %(epoch, epoch_num, test_acc) )
 		print('[%d/%d]Test ADV accu: %.3f' %(epoch, epoch_num, test_adv_acc) )
+		print('[%d/%d]White-box Attack test accuracy: %.3f' %(epoch, epoch_num,TestAdvAcc_dataloader(netD, test_data, 'sign', 0.03)))
 		netD.train()
-		netD_cp = copy.deepcopy(netD)
-		print(acquireGradient(netD_cp, train_data, test_data, loss_func))
+		print(acquireGradient(netD, train_data, test_data, loss_func))
+		
 		#print(acquireGradient(netD_cp, train_data, loss_func), acquireGradient(netD_cp, test_data, loss_func),acquireGradient(netD_cp, inter_data, loss_func))
 			
 	

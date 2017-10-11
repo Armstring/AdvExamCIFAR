@@ -224,8 +224,8 @@ def adv_train_GAN(train_data, test_data):
 def adv_train_gradient(train_data, test_data, norm, coef, adv_step):
 	netD = _netD_cifar10()
 	netD.cuda()
-	optimizerD = optim.Adam(netD.parameters(), lr=lr_D, betas=(0.9, 0.999), weight_decay = 0.01)
-	#optimizerD = optim.SGD(netD.parameters(), lr=0.02, weight_decay = 0.01)
+	#optimizerD = optim.Adam(netD.parameters(), lr=lr_D, betas=(0.9, 0.999), weight_decay = 0.01)
+	optimizerD = optim.SGD(netD.parameters(), lr=0.02, weight_decay = 0.01)
 	loss_func = nn.CrossEntropyLoss()
 
 	if True:
@@ -263,8 +263,8 @@ def adv_train_gradient(train_data, test_data, norm, coef, adv_step):
 				print('[%d/%d]Test accu: %.3f' %(epoch, epoch_num, test_acc) )
 				print('[%d/%d]Test ADV accu: %.3f' %(epoch, epoch_num, test_adv_acc) )
 				netD.train()
-			if epoch % 7 ==6:
-				optimizerD.param_groups[0]['lr'] /= 1.0
+			if epoch % 10 ==9:
+				optimizerD.param_groups[0]['lr'] /= 2.0
 		if norm=='sign':
 			torch.save(netD.state_dict(), './netD_FGSM_step%d.pkl' %(adv_step))
 		else:
