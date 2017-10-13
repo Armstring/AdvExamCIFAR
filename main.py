@@ -40,6 +40,7 @@ torch.save((feature_inter_set, labelset), 'inter.pt')
 inter_data = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(feature_inter_set, labelset),
     batch_size=64, shuffle=True, drop_last = False)
 '''
+qq = 15
 
 def acquireGradient(netD, dataset1, dataset2, loss_func):
 	list1 = dict([])
@@ -51,30 +52,45 @@ def acquireGradient(netD, dataset1, dataset2, loss_func):
 	for i,data_batch in enumerate(dataset1):
 		feature,label = data_batch
 		feature,label = Variable(feature.cuda(), requires_grad = True), Variable(label.cuda())
+		
+		netD.train()
+		netD.zero_grad()
 		outputs = netD(feature)
-		error = .0
-		for j in range(outputs.size()[0]):
-			error -= outputs[j][label.data[j]]
-		#error = loss_func(outputs, label)
+		#error = .0
+		#for j in range(outputs.size()[0]):
+		#	error -= outputs[j][label.data[j]]
+		error = loss_func(outputs, label)
 		error.backward()
 		for name, par in netD.named_parameters():
-			list1[name] += par.grad.data
+			if 'weight' in name:
+				list1[name] += par.grad.data
+				#if i==qq:
+				#	print("%20s %3.4f %3.4f %3.4f %3.4f" %(name, torch.norm(par.data), torch.max(par.data), torch.norm(par.grad.data), torch.max(par.grad.data)))
+		
 		num1 += 1 
 		
-
+	print("*****"*5)
 	num2 =0
 	for i,data_batch in enumerate(dataset2):
 		feature,label = data_batch
 		feature,label = Variable(feature.cuda(), requires_grad = True), Variable(label.cuda())
+		
+		netD.train()
+		netD.zero_grad()
 		outputs = netD(feature)
-		error = .0
-		for j in range(outputs.size()[0]):
-			error -= outputs[j][label.data[j]]
-		#error = loss_func(outputs, label)
+		#error = .0
+		#for j in range(outputs.size()[0]):
+		#	error -= outputs[j][label.data[j]]
+		error = loss_func(outputs, label)
 		error.backward()
 		for name, par in netD.named_parameters():
-			list2[name] += par.grad.data
+			if 'weight' in name:
+				list2[name] += par.grad.data
+				#if i==qq:
+				#	print("%20s %3.4f %3.4f %3.4f %3.4f" %(name, torch.norm(par.data), torch.max(par.data), torch.norm(par.grad.data), torch.max(par.grad.data)))
+		
 		num2 += 1 
+	print("*****"*5)
 
 	res1 = 0.0
 	res2 = 0.0
@@ -86,7 +102,7 @@ def acquireGradient(netD, dataset1, dataset2, loss_func):
 			res1 = torch.norm(list1[name]/num1,2)
 			res2 = torch.norm(list2[name]/num2,2)
 			res = torch.dot(list1[name].view(-1)/(num1*res1), list2[name].view(-1)/(num2*res2))
-			print(name, res1, res2, res)
+			print("%20s %2.5f \t %2.5f \t %.4f" %(name, res1, res2, res))
 		#print("===2===")
 	return 
 
@@ -101,39 +117,51 @@ def acquireAdvGradient(netD, dataset1, dataset2, loss_func):
 		feature,label = data_batch
 		netD_cp = copy.deepcopy(netD)
 		feature_adv = model_train.advexam_gradient(netD_cp, feature, label, 'sign', coef_FGSM, 1)
-		feature, label = Variable(feature_adv), Variable(label.cuda())
+		feature_adv, label = Variable(feature_adv), Variable(label.cuda())
 
+
+		netD.train()
+		netD.zero_grad()
 		#feature,label = Variable(feature.cuda(), requires_grad = True), Variable(label.cuda())
-		outputs = netD(feature)
-		error = .0
-		for j in range(outputs.size()[0]):
-			error -= outputs[j][label.data[j]]
-		#error = loss_func(outputs, label)
+		outputs = netD(feature_adv)
+		#error = .0
+		#for j in range(outputs.size()[0]):
+		#	error -= outputs[j][label.data[j]]
+		error = loss_func(outputs, label)
 		error.backward()
 		for name, par in netD.named_parameters():
-			list1[name] += par.grad.data
+			if 'weight' in name:
+				list1[name] += par.grad.data
+				#if i==qq:
+				#	print("%20s %3.4f %3.4f %3.4f %3.4f" %(name, torch.norm(par.data), torch.max(par.data), torch.norm(par.grad.data), torch.max(par.grad.data)))
 		num1 += 1 
 		
-
+	print("*****"*5)
 	num2 =0
 	for i,data_batch in enumerate(dataset2):
 		feature,label = data_batch
 		netD_cp = copy.deepcopy(netD)
 		feature_adv = model_train.advexam_gradient(netD_cp, feature, label, 'sign', coef_FGSM, 1)
-		feature, label = Variable(feature_adv), Variable(label.cuda())
+		feature_adv, label = Variable(feature_adv), Variable(label.cuda())
 
 
+		netD.train()
+		netD.zero_grad()
 		#feature,label = Variable(feature.cuda(), requires_grad = True), Variable(label.cuda())
-		outputs = netD(feature)
-		error = .0
-		for j in range(outputs.size()[0]):
-			error -= outputs[j][label.data[j]]
-		#error = loss_func(outputs, label)
+		outputs = netD(feature_adv)
+		#error = .0
+		#for j in range(outputs.size()[0]):
+		#	error -= outputs[j][label.data[j]]
+		error = loss_func(outputs, label)
 		error.backward()
 		for name, par in netD.named_parameters():
-			list2[name] += par.grad.data
+			if 'weight' in name:
+				list2[name] += par.grad.data
+				#if i==qq:
+				#	print("%20s %3.4f %3.4f %3.4f %3.4f" %(name, torch.norm(par.data), torch.max(par.data), torch.norm(par.grad.data), torch.max(par.grad.data)))
 		num2 += 1 
 
+	print("*****"*5)
 	res1 = 0.0
 	res2 = 0.0
 	res = 0.0
@@ -141,16 +169,16 @@ def acquireAdvGradient(netD, dataset1, dataset2, loss_func):
 	#num_term = 0
 	for name in list1.keys():
 		if 'weight' in name:
-			res1 = torch.norm(list1[name]/num1,2)
-			res2 = torch.norm(list2[name]/num2,2)
+			res1 = (list1[name]/num1).norm(p=2)
+			res2 = (list2[name]/num2).norm(p=2)
 			res = torch.dot(list1[name].view(-1)/(num1*res1), list2[name].view(-1)/(num2*res2))
-			print(name, res1, res2, res)
+			print("%20s %2.5f \t %2.5f \t %.4f" %(name, res1, res2, res))
 		#print("===2===")
 	return 
 
 netD = _netD_cifar10()
 netD.cuda()
-netD.load_state_dict(torch.load('netD.pkl'))
+#netD.load_state_dict(torch.load('netD.pkl'))
 #print('Test accuracy of netD: %.3f'%(TestAcc_dataloader(netD,test_data)))
 loss_func = nn.CrossEntropyLoss()
 #netD_cp = copy.deepcopy(netD)
@@ -162,7 +190,7 @@ acquireAdvGradient(netD, train_data, test_data, loss_func)
 
 netD = _netD_cifar10()
 netD.cuda()
-optimizerD = optim.SGD(netD.parameters(), lr=0.001, weight_decay = 0.0002)
+optimizerD = optim.SGD(netD.parameters(), lr=0.01, weight_decay = 0.0002)
 
 
 for epoch in range(epoch_num):
@@ -193,7 +221,7 @@ for epoch in range(epoch_num):
 			running_acc_D = .0
 		if epoch%5==2 and i%500==0:
 			vutils.save_image(feature_adv.data, './adv_image/adv_image_epoch_%03d_%03d.png' %(epoch,i), normalize = True)
-	if epoch % 10 ==9:
+	if epoch in {10,20,25,30}:
 				optimizerD.param_groups[0]['lr'] /= 2.0
 	if epoch % 5 == 0:
 		dataset_adv = torch.load('./adv_exam/adv_gradient_FGSM_step1.pt')
@@ -204,7 +232,7 @@ for epoch in range(epoch_num):
 		print('[%d/%d]Test ADV accu: %.3f' %(epoch, epoch_num, test_adv_acc) )
 		print('[%d/%d]White-box Attack train accuracy: %.3f' %(epoch, epoch_num,TestAdvAcc_dataloader(netD, train_data, 'sign', 0.03)))
 		print('[%d/%d]White-box Attack test accuracy: %.3f' %(epoch, epoch_num,TestAdvAcc_dataloader(netD, test_data, 'sign', 0.03)))
-		netD.train()
+		
 		print("===="*5)
 		acquireGradient(netD, train_data, test_data, loss_func)
 		print("===="*5)
