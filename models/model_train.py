@@ -16,6 +16,7 @@ def infnorm(tensor):
 	return torch.max(torch.abs(tensor))
 
 def advexam_gradient(netD, feature, label, flag, coef, iter_num):
+
 	perturb = torch.zeros(feature.size()).cuda()
 	#perturb.normal_(0.0,0.0001)
 	feature, label = Variable(feature.cuda()), Variable(label.cuda())
@@ -27,6 +28,7 @@ def advexam_gradient(netD, feature, label, flag, coef, iter_num):
 	else:
 		p_coef = 1.0*coef/iter_num
 
+	netD.eval()
 	for i in range(iter_num):
 		feature_adv = feature + perturb
 		feature_adv.data.clamp_(min=-1.0, max = 1.0)
@@ -38,20 +40,20 @@ def advexam_gradient(netD, feature, label, flag, coef, iter_num):
 		_, pred = torch.max(outputs, 1)
 
 		for j,image in enumerate(feature):
-			if pred[j]==label[j]:
+			if pred.data[j]==label.data[j]:
 				if flag=='sign':
-					perturb[j] +=  p_coef*torch.sign(perturb.grad[j])
+					perturb.data[j] +=  p_coef*torch.sign(perturb.grad.data[j])
 				else:
 					duel_norm = flag/(flag-1.0)
-					perturb[j] += p_coef * perturb.grad[j]/torch.norm(perturb.grad[j].data, p = duel_norm)
+					perturb.data[j] += p_coef * perturb.grad.data[j]/torch.norm(perturb.grad[j].data, p = duel_norm)
 		
 	feature_adv = feature + perturb
 	feature_adv.data.clamp_(min=-1.0, max = 1.0)
 	return feature_adv.data
 
 def advexam_ll(netD, feature, label, flag, coef, iter_num):
-	perturb = torch.FloatTensor(feature.size()).cuda()
-	perturb.normal_(0.0,0.0001)
+	perturb = torch.zeros(feature.size()).cuda()
+	#perturb.normal_(0.0,0.0001)
 	feature, label = Variable(feature.cuda()), Variable(label.cuda())
 	perturb = Variable(perturb, requires_grad = True)
 	
@@ -60,7 +62,7 @@ def advexam_ll(netD, feature, label, flag, coef, iter_num):
 		p_coef = coef
 	else:
 		p_coef = 1.1*coef/iter_num
-
+	netD.eval()
 	for i in range(iter_num):
 		feature_adv = feature + perturb
 		feature_adv.data.clamp_(min=-1.0, max = 1.0)
@@ -70,12 +72,12 @@ def advexam_ll(netD, feature, label, flag, coef, iter_num):
 		_, pred = torch.max(outputs, 1)
 
 		for j,image in enumerate(feature):
-			if pred[j]==label[j]:
+			if True:#pred.data[j]==label.data[j]:
 				if flag=='sign':
-					perturb[j] +=  p_coef*torch.sign(perturb.grad[j])
+					perturb.data[j] +=  p_coef*torch.sign(perturb.grad.data[j])
 				else:
 					duel_norm = flag/(flag-1.0)
-					perturb[j] += p_coef * perturb.grad[j]/torch.norm(perturb.grad[j].data, p = duel_norm)
+					perturb.data[j] += p_coef * perturb.grad.data[j]/torch.norm(perturb.grad[j].data, p = duel_norm)
 		
 	feature_adv = feature + perturb
 	feature_adv.data.clamp_(min=-1.0, max = 1.0)
@@ -92,7 +94,7 @@ def advexam_gap(netD, feature, label, flag, coef, iter_num):
 		p_coef = coef
 	else:
 		p_coef = 1.1*coef/iter_num
-
+	netD.eval()
 	for i in range(iter_num):
 		feature_adv = feature + perturb
 		feature_adv.data.clamp_(min=-1.0, max = 1.0)
@@ -103,12 +105,12 @@ def advexam_gap(netD, feature, label, flag, coef, iter_num):
 		_, pred = torch.max(outputs, 1)
 
 		for j,image in enumerate(feature):
-			if pred[j]==label[j]:
+			if pred.data[j]==label.data[j]:
 				if flag=='sign':
-					perturb[j] +=  p_coef*torch.sign(perturb.grad[j])
+					perturb.data[j] +=  p_coef*torch.sign(perturb.grad.data[j])
 				else:
 					duel_norm = flag/(flag-1.0)
-					perturb[j] += p_coef * perturb.grad[j]/torch.norm(perturb.grad[j].data, p = duel_norm)
+					perturb.data[j] += p_coef * perturb.grad.data[j]/torch.norm(perturb.grad[j].data, p = duel_norm)
 		
 	feature_adv = feature + perturb
 	feature_adv.data.clamp_(min=-1.0, max = 1.0)

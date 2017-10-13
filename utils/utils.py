@@ -4,6 +4,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 from constants import *
 import torch.nn.init as init
+import copy
 
 def weights_init(layer):
   classname = layer.__class__.__name__
@@ -24,34 +25,16 @@ def accu(output, label):
   _, pred = torch.max(output, 1)
   return 1.0*(pred.data==label.data).sum()
 
-def TestAdvAcc_dataloader(net, dataset, flag, p_coef):
+def TestAdvAcc_dataloader(net, dataset, flag, p_coef, method):
   adv_acc = .0
   num = 0
   net.eval()
   for i,data_batch in enumerate(dataset):
     feature, label = data_batch
-
-    perturb = torch.zeros(feature.size()).cuda()
-    feature, label = Variable(feature.cuda()), Variable(label.cuda())
-    perturb = Variable(perturb, requires_grad = True)
-    feature_adv = feature + perturb
-
-    outputs = net(feature_adv)
-    error = .0
-    for j in range(outputs.size()[0]):
-      error -= outputs[j][label.data[j]]
-    error.backward()
-    _, pred = torch.max(outputs, 1)
-    
-    for j,image in enumerate(feature):
-      if pred[j]==label[j]:
-        if flag=='sign':
-          perturb[j] +=  p_coef*torch.sign(perturb.grad[j])
-        else:
-          duel_norm = flag/(flag-1.0)
-          perturb[j] += p_coef * perturb.grad[j]/torch.norm(perturb.grad[j].data, p = duel_norm)
-    feature_adv = feature + perturb
-    feature_adv.data.clamp_(min=-1.0, max = 1.0)
+    netD_cp = copy.deepcopy(net)
+    feature_adv = method(netD_cp, feature, label, flag, p_coef, 1)
+    feature_adv, label = Variable(feature_adv), Variable(label.cuda())
+  
     outputs = net(feature_adv.detach())
 
     adv_acc += accu(outputs, label)

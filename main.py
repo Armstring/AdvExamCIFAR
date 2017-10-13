@@ -40,7 +40,7 @@ torch.save((feature_inter_set, labelset), 'inter.pt')
 inter_data = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(feature_inter_set, labelset),
     batch_size=64, shuffle=True, drop_last = False)
 '''
-qq = 15
+attack_method = model_train.advexam_gradient
 
 def acquireGradient(netD, dataset1, dataset2, loss_func):
 	list1 = dict([])
@@ -116,7 +116,7 @@ def acquireAdvGradient(netD, dataset1, dataset2, loss_func):
 	for i,data_batch in enumerate(dataset1):
 		feature,label = data_batch
 		netD_cp = copy.deepcopy(netD)
-		feature_adv = model_train.advexam_gradient(netD_cp, feature, label, 'sign', coef_FGSM, 1)
+		feature_adv = attack_method(netD_cp, feature, label, 'sign', coef_FGSM, 1)
 		feature_adv, label = Variable(feature_adv), Variable(label.cuda())
 
 
@@ -141,7 +141,7 @@ def acquireAdvGradient(netD, dataset1, dataset2, loss_func):
 	for i,data_batch in enumerate(dataset2):
 		feature,label = data_batch
 		netD_cp = copy.deepcopy(netD)
-		feature_adv = model_train.advexam_gradient(netD_cp, feature, label, 'sign', coef_FGSM, 1)
+		feature_adv = attack_method(netD_cp, feature, label, 'sign', coef_FGSM, 1)
 		feature_adv, label = Variable(feature_adv), Variable(label.cuda())
 
 
@@ -202,7 +202,7 @@ for epoch in range(epoch_num):
 		netD.zero_grad()
 		feature,label = data_batch
 		netD_cp = copy.deepcopy(netD)
-		feature_adv = model_train.advexam_gradient(netD_cp, feature, label, 'sign', coef_FGSM, 1)
+		feature_adv = attack_method(netD_cp, feature, label, 'sign', coef_FGSM, 1)
 		feature_adv, label = Variable(feature_adv), Variable(label.cuda())
 				
 		outputs = netD(feature_adv.detach())
@@ -226,12 +226,13 @@ for epoch in range(epoch_num):
 	if epoch % 5 == 0:
 		dataset_adv = torch.load('./adv_exam/adv_gradient_FGSM_step1.pt')
 		netD.eval()
+		train_acc = TestAcc_dataloader(netD, train_data)
 		test_acc = TestAcc_dataloader(netD, test_data)
-		test_adv_acc = TestAcc_tensor(netD, dataset_adv)
-		print('[%d/%d]Test accu: %.3f' %(epoch, epoch_num, test_acc) )
-		print('[%d/%d]Test ADV accu: %.3f' %(epoch, epoch_num, test_adv_acc) )
-		print('[%d/%d]White-box Attack train accuracy: %.3f' %(epoch, epoch_num,TestAdvAcc_dataloader(netD, train_data, 'sign', 0.03)))
-		print('[%d/%d]White-box Attack test accuracy: %.3f' %(epoch, epoch_num,TestAdvAcc_dataloader(netD, test_data, 'sign', 0.03)))
+		#test_adv_acc = TestAcc_tensor(netD, dataset_adv)
+		print('[%d/%d]Train accu: %.3f' %(epoch, epoch_num, train_acc) )
+		print('[%d/%d]Test  accu: %.3f' %(epoch, epoch_num, test_acc) )
+		print('[%d/%d]White-box Attack train accuracy: %.3f' %(epoch, epoch_num,TestAdvAcc_dataloader(netD, train_data, 'sign', coef_FGSM, attack_method)))
+		print('[%d/%d]White-box Attack test accuracy: %.3f' %(epoch, epoch_num,TestAdvAcc_dataloader(netD, test_data, 'sign', coef_FGSM, attack_method)))
 		
 		print("===="*5)
 		acquireGradient(netD, train_data, test_data, loss_func)
