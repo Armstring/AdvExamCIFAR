@@ -64,12 +64,9 @@ def acquireGradient(netD, dataset1, dataset2, loss_func):
 		for name, par in netD.named_parameters():
 			if 'weight' in name:
 				list1[name] += par.grad.data
-				#if i==qq:
-				#	print("%20s %3.4f %3.4f %3.4f %3.4f" %(name, torch.norm(par.data), torch.max(par.data), torch.norm(par.grad.data), torch.max(par.grad.data)))
-		
 		num1 += 1 
 		
-	print("*****"*5)
+	#print("*****"*5)
 	num2 =0
 	for i,data_batch in enumerate(dataset2):
 		feature,label = data_batch
@@ -86,33 +83,30 @@ def acquireGradient(netD, dataset1, dataset2, loss_func):
 		for name, par in netD.named_parameters():
 			if 'weight' in name:
 				list2[name] += par.grad.data
-				#if i==qq:
-				#	print("%20s %3.4f %3.4f %3.4f %3.4f" %(name, torch.norm(par.data), torch.max(par.data), torch.norm(par.grad.data), torch.max(par.grad.data)))
-		
 		num2 += 1 
-	print("*****"*5)
+	#print("*****"*5)
 
-	res1 = 0.0
-	res2 = 0.0
-	res = 0.0
+	#res1 = 0.0
+	#res2 = 0.0
+	#res = 0.0
 	#print("===1===")
 	#num_term = 0
-	for name in list1.keys():
-		if 'weight' in name:
-			res1 = torch.norm(list1[name]/num1,2)
-			res2 = torch.norm(list2[name]/num2,2)
-			res = torch.dot(list1[name].view(-1)/(num1*res1), list2[name].view(-1)/(num2*res2))
-			print("%20s %2.5f \t %2.5f \t %.4f" %(name, res1, res2, res))
+	#for name in list1.keys():
+		#if 'weight' in name:
+			#res1 = torch.norm(list1[name]/num1,2)
+			#res2 = torch.norm(list2[name]/num2,2)
+			#res = torch.dot(list1[name].view(-1)/(num1*res1), list2[name].view(-1)/(num2*res2))
+			#print("%20s %2.5f \t %2.5f \t %.4f" %(name, res1, res2, res))
 		#print("===2===")
-	return 
+#	return 
 
-def acquireAdvGradient(netD, dataset1, dataset2, loss_func):
-	list1 = dict([])
-	list2 = dict([])
+#def acquireAdvGradient(netD, dataset1, dataset2, loss_func):
+	list3 = dict([])
+	list4 = dict([])
 	for name, par in netD.named_parameters():
-		list1[name] = torch.zeros(par.size()).cuda()
-		list2[name] = torch.zeros(par.size()).cuda()
-	num1 = 0
+		list3[name] = torch.zeros(par.size()).cuda()
+		list4[name] = torch.zeros(par.size()).cuda()
+	num3 = 0
 	for i,data_batch in enumerate(dataset1):
 		feature,label = data_batch
 		netD_cp = copy.deepcopy(netD)
@@ -131,13 +125,11 @@ def acquireAdvGradient(netD, dataset1, dataset2, loss_func):
 		error.backward()
 		for name, par in netD.named_parameters():
 			if 'weight' in name:
-				list1[name] += par.grad.data
-				#if i==qq:
-				#	print("%20s %3.4f %3.4f %3.4f %3.4f" %(name, torch.norm(par.data), torch.max(par.data), torch.norm(par.grad.data), torch.max(par.grad.data)))
-		num1 += 1 
+				list3[name] += par.grad.data
+		num3 += 1 
 		
-	print("*****"*5)
-	num2 =0
+	#print("*****"*5)
+	num4 =0
 	for i,data_batch in enumerate(dataset2):
 		feature,label = data_batch
 		netD_cp = copy.deepcopy(netD)
@@ -156,25 +148,74 @@ def acquireAdvGradient(netD, dataset1, dataset2, loss_func):
 		error.backward()
 		for name, par in netD.named_parameters():
 			if 'weight' in name:
-				list2[name] += par.grad.data
-				#if i==qq:
-				#	print("%20s %3.4f %3.4f %3.4f %3.4f" %(name, torch.norm(par.data), torch.max(par.data), torch.norm(par.grad.data), torch.max(par.grad.data)))
-		num2 += 1 
+				list4[name] += par.grad.data
+		num4 += 1 
 
 	print("*****"*5)
 	res1 = 0.0
 	res2 = 0.0
-	res = 0.0
-	#print("===1===")
-	#num_term = 0
+	res3 = 0.0
+	res4 = 0.0
+	#res = 0.0
 	for name in list1.keys():
 		if 'weight' in name:
 			res1 = (list1[name]/num1).norm(p=2)
 			res2 = (list2[name]/num2).norm(p=2)
-			res = torch.dot(list1[name].view(-1)/(num1*res1), list2[name].view(-1)/(num2*res2))
-			print("%20s %2.5f \t %2.5f \t %.4f" %(name, res1, res2, res))
+			res3 = (list3[name]/num3).norm(p=2)
+			res4 = (list4[name]/num4).norm(p=2)
+			res_cor1 = torch.dot(list1[name].view(-1)/(num1*res1), list3[name].view(-1)/(num3*res3))
+
+			res_cor2 = torch.dot(list2[name].view(-1)/(num2*res2), list3[name].view(-1)/(num3*res3))
+			
+			res_cor3 = torch.dot(list4[name].view(-1)/(num4*res4), list3[name].view(-1)/(num3*res3))
+			
+			print("%20s %2.5f \t %2.5f \t %.4f" %(name, res_cor1, res_cor2, res_cor3))
 		#print("===2===")
 	return 
+
+def acquireInputGradient(netD, dataset1, dataset2, loss_func):
+	netD.eval()
+	res1 = 0.0
+	res1_error = 0.0
+	num1 = 0
+	for i, data_batch in enumerate(dataset1):
+		feature, label = data_batch
+		netD_cp = copy.deepcopy(netD)
+		perturb = torch.zeros(feature.size()).cuda()
+		feature, label = Variable(feature.cuda()), Variable(label.cuda())
+		perturb = Variable(perturb, requires_grad = True)
+		feature_adv = feature + perturb
+		outputs = netD(feature_adv)
+		error = loss_func(outputs, label)
+		error.backward()
+		res_temp = 0.0
+		for j,image in enumerate(feature):
+			res_temp  += torch.max(torch.abs(perturb.grad[j].data))
+		res1 += res_temp/feature.size()[0]
+		res1_error += error.data[0]
+		num1 +=1
+	res2 = 0.0
+	res2_error = 0.0
+	num2 = 0
+	for i, data_batch in enumerate(dataset2):
+		feature, label = data_batch
+		netD_cp = copy.deepcopy(netD)
+		perturb = torch.zeros(feature.size()).cuda()
+		feature, label = Variable(feature.cuda()), Variable(label.cuda())
+		perturb = Variable(perturb, requires_grad = True)
+		feature_adv = feature + perturb
+		outputs = netD(feature_adv)
+		error = loss_func(outputs, label)
+		error.backward()
+		res_temp = 0.0
+		for j,image in enumerate(feature):
+			res_temp  += torch.max(torch.abs(perturb.grad[j].data))
+		res2 += res_temp/feature.size()[0]
+		res2_error += error.data[0]
+		num2 +=1
+	print("%3.5f \t %3.5f \t %3.5f \t %3.5f" %(res1/num1, res1_error/num1, res2/num2, res1_error/num2))
+	return
+
 
 netD = _netD_cifar10()
 netD.cuda()
@@ -184,9 +225,10 @@ loss_func = nn.CrossEntropyLoss()
 #netD_cp = copy.deepcopy(netD)
 netD.train()
 print("===="*5)
-acquireGradient(netD, train_data, test_data, loss_func)
-print("===="*5)
-acquireAdvGradient(netD, train_data, test_data, loss_func)
+#acquireGradient(netD, train_data, test_data, loss_func)
+acquireInputGradient(netD, train_data, test_data, loss_func)
+#print("===="*5)
+#acquireAdvGradient(netD, train_data, test_data, loss_func)
 
 netD = _netD_cifar10()
 netD.cuda()
@@ -235,9 +277,10 @@ for epoch in range(epoch_num):
 		print('[%d/%d]White-box Attack test accuracy: %.3f' %(epoch, epoch_num,TestAdvAcc_dataloader(netD, test_data, 'sign', coef_FGSM, attack_method)))
 		
 		print("===="*5)
-		acquireGradient(netD, train_data, test_data, loss_func)
-		print("===="*5)
-		acquireAdvGradient(netD, train_data, test_data, loss_func)
+		#acquireGradient(netD, train_data, test_data, loss_func)
+		acquireInputGradient(netD, train_data, test_data, loss_func)
+		#print("===="*5)
+		#acquireAdvGradient(netD, train_data, test_data, loss_func)
 		
 		#print(acquireGradient(netD_cp, train_data, loss_func), acquireGradient(netD_cp, test_data, loss_func),acquireGradient(netD_cp, inter_data, loss_func))
 			
