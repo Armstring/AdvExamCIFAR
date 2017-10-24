@@ -39,11 +39,14 @@ def acquireInputGradient(netD, dataset1, dataset2, loss_func):
 		perturb = Variable(perturb, requires_grad = True)
 		feature_adv = feature + perturb
 		outputs = netD(feature_adv)
+		_, pred = torch.max(outputs, 1)
 		error = loss_func(outputs, label)
+
 		error.backward()
 		res_temp = 0.0
 		for j,image in enumerate(feature):
-			res_temp  += torch.sum(torch.abs(perturb.grad[j].data))
+			if pred.data[j]==label.data[j]:
+				res_temp  += torch.sum(torch.abs(perturb.grad[j].data))
 		res1 += res_temp/feature.size()[0]
 		res1_error += error.data[0]
 		num1 +=1
@@ -61,11 +64,14 @@ def acquireInputGradient(netD, dataset1, dataset2, loss_func):
 		perturb = Variable(perturb, requires_grad = True)
 		feature_adv = feature + perturb
 		outputs = netD(feature_adv)
+		_, pred = torch.max(outputs, 1)
 		error = loss_func(outputs, label)
+
 		error.backward()
 		res_temp = 0.0
 		for j,image in enumerate(feature):
-			res_temp  += torch.sum(torch.abs(perturb.grad[j].data))
+			if pred.data[j]==label.data[j]:
+				res_temp  += torch.sum(torch.abs(perturb.grad[j].data))
 		res2 += res_temp/feature.size()[0]
 		res2_error += error.data[0]
 		num2 +=1
@@ -92,7 +98,9 @@ for epoch in range(epoch_num):
 		label = label.cuda()
 		gaussnoise = torch.zeros(feature.size()).cuda()
 		gaussnoise.normal_()
-		feature_gau = feature + 0.02* gaussnoise
+		for j, noise in enumerate(gaussnoise):
+			gaussnoise[j] = torch.sign(gaussnoise[j])# /torch.norm(noise.view(-1),2)
+		feature_gau = feature + 0.01* gaussnoise
 
 
 		netD_cp = copy.deepcopy(netD)
@@ -123,7 +131,7 @@ for epoch in range(epoch_num):
 		#if epoch%5==2 and i%500==0:
 			#vutils.save_image(feature_gau_adv.data, './adv_image/adv_image_epoch_%03d_%03d_perb.png' %(epoch,i), normalize = True)
 			#vutils.save_image(feature.data, './adv_image/adv_image_epoch_%03d_%03d_orig.png' %(epoch,i), normalize = True)
-	if epoch in {10,20,25,30}:
+	if epoch in {20,35,50}:
 				optimizerD.param_groups[0]['lr'] /= 2.0
 				#coef_FGSM *= 1.5
 	if epoch % 5 == 0:

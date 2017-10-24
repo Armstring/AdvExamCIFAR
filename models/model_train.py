@@ -15,21 +15,22 @@ import copy
 def infnorm(tensor):
 	return torch.max(torch.abs(tensor))
 
-def advexam_gradient(netD, feature, label, flag, coef, iter_num):
+def advexam_gradient(netD, feature, label, flag, coef, iter_num, mag):
 
 	perturb = torch.zeros(feature.size()).cuda()
 	#perturb.normal_(0.0,0.0001)
 	feature, label = Variable(feature.cuda()), Variable(label.cuda())
 	perturb = Variable(perturb, requires_grad = True)
 	
-	p_coef = 0.0
-	if iter_num==1:
-		p_coef = coef
-	else:
-		p_coef = 1.0*coef/iter_num
+	p_coef = coef#0.0
+	#if iter_num==1:
+	#	p_coef = coef
+	#else:
+	#	p_coef = 1.05*coef/iter_num
 
 	netD.eval()
 	for i in range(iter_num):
+		perturb.data.clamp_(min=-mag, max =mag)
 		feature_adv = feature + perturb
 		feature_adv.data.clamp_(min=-1.0, max = 1.0)
 		outputs = netD(feature_adv)
@@ -40,13 +41,14 @@ def advexam_gradient(netD, feature, label, flag, coef, iter_num):
 		_, pred = torch.max(outputs, 1)
 
 		for j,image in enumerate(feature):
-			if pred.data[j]==label.data[j]:
+			if True:#pred.data[j]==label.data[j]:
 				if flag=='sign':
 					perturb.data[j] +=  p_coef*torch.sign(perturb.grad.data[j])
 				else:
 					duel_norm = flag/(flag-1.0)
 					perturb.data[j] += p_coef * perturb.grad.data[j]/torch.norm(perturb.grad[j].data, p = duel_norm)
-		
+	
+	perturb.data.clamp_(min=-mag, max =mag)
 	feature_adv = feature + perturb
 	feature_adv.data.clamp_(min=-1.0, max = 1.0)
 	return feature_adv.data

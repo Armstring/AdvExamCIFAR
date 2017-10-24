@@ -2,7 +2,7 @@
 #data parameters
 image_size = 32*32
 image_shape = (32, 32)
-
+num_channel = 3
 ####################################
 #network parameters
 nc_netG = 3
@@ -26,7 +26,7 @@ batch_size = 64
 test_batch_size = 1000
 ###################################
 ###perturbation magnitude for training
-coef_FGSM = 0.02
+coef_FGSM = 0.01
 coef_L2 = 1.0
 
 coef_FGSM_gap = 0.3

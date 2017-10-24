@@ -20,6 +20,7 @@ from dataProcess.read_data import read_CIFAR10
 batch_size = 64
 test_batch_size = 1000
 train_data , test_data = read_CIFAR10(batch_size, test_batch_size)
+epoch_num = 20
 
 netD = _netD_cifar10()
 netD.cuda()
@@ -51,7 +52,7 @@ for epoch in range(epoch_num):
       running_loss = .0
       running_acc = .0
   print('Test accuracy of netD: %.3f'%(TestAcc_dataloader(netD,test_data)))
-  if epoch in {5,10,15,20,25,30,35}:
+  if epoch in {5,10,20,30}:
     optimizerD.param_groups[0]['lr'] /= 2.0
   
 

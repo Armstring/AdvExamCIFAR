@@ -25,33 +25,43 @@ def accu(output, label):
   _, pred = torch.max(output, 1)
   return 1.0*(pred.data==label.data).sum()
 
-def TestAdvAcc_dataloader(net, dataset, flag, p_coef, method):
+def TestAdvAcc_dataloader(net, dataset, flag, p_coef, method, loss_func, num_iter, mag):
   adv_acc = .0
   num = 0
   net.eval()
+  res = 0.0
+  qq = 0
   for i,data_batch in enumerate(dataset):
     feature, label = data_batch
     netD_cp = copy.deepcopy(net)
-    feature_adv = method(netD_cp, feature, label, flag, p_coef, 1)
+    feature_adv = method(netD_cp, feature, label, flag, p_coef, num_iter, mag)
     feature_adv, label = Variable(feature_adv), Variable(label.cuda())
   
     outputs = net(feature_adv.detach())
-
+    error = loss_func(outputs, label)
+    res += error.data[0]
     adv_acc += accu(outputs, label)
     num += label.size()[0]
-  return 1.0*adv_acc/num
+    qq+=1
+  #print("%5.5f" %(res/qq))
+  return (1.0*adv_acc/num, res/qq)
 
-def TestAcc_dataloader(net, dataset):
+def TestAcc_dataloader(net, dataset, loss_func):
   acc = .0
   num = 0
   net.eval()
+  res = 0.0
+  qq = 0
   for i,data_batch in enumerate(dataset):
     feature, label = data_batch
     feature, label = Variable(feature.cuda()), Variable(label.cuda())
     outputs = net(feature)
+    error = loss_func(outputs, label)
     acc += accu(outputs, label)
+    res += error.data[0]
     num += label.size()[0]
-  return 1.0*acc/num
+    qq+=1
+  return (1.0*acc/num, res/qq)
 
 def TestAcc_tensor(net, dataset):
   dataloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(dataset[0], dataset[1]),
@@ -62,7 +72,7 @@ def TestAcc_tensorpath(netD, advpath):
   dataset = torch.load(advpath)
   return TestAcc_tensor(netD, dataset_adv)
 
-def AdcAcc_Gnet(netD, netG, testset, coef):
+def AdvAcc_Gnet(netD, netG, testset, coef):
   adv_acc = .0
   loss_func = nn.CrossEntropyLoss()
   for i,data_batch in enumerate(testset):
