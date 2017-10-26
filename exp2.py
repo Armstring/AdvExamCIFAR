@@ -165,10 +165,6 @@ for i in range(num_trial):
 			optimizerD.param_groups[0]['lr'] /= 2.0
 
 
-a
-
-
-
 
 
 

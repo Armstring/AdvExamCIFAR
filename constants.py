@@ -26,7 +26,7 @@ batch_size = 64
 test_batch_size = 1000
 ###################################
 ###perturbation magnitude for training
-coef_FGSM = 0.01
+coef_FGSM = 0.03
 coef_L2 = 1.0
 
 coef_FGSM_gap = 0.3

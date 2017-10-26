@@ -63,10 +63,10 @@ def TestAcc_dataloader(net, dataset, loss_func):
     qq+=1
   return (1.0*acc/num, res/qq)
 
-def TestAcc_tensor(net, dataset):
+def TestAcc_tensor(net, dataset,loss_func):
   dataloader = torch.utils.data.DataLoader(torch.utils.data.TensorDataset(dataset[0], dataset[1]),
     batch_size=64, shuffle=True, drop_last = False)
-  return TestAcc_dataloader(net, dataloader)
+  return TestAcc_dataloader(net, dataloader,loss_func)
 
 def TestAcc_tensorpath(netD, advpath):
   dataset = torch.load(advpath)

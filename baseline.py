@@ -19,14 +19,14 @@ from dataProcess.read_data import read_CIFAR10
 #torch.cuda.manual_seed(31415926)
 batch_size = 64
 test_batch_size = 1000
-train_data , test_data = read_CIFAR10(batch_size, test_batch_size)
+train_data , valid_data, test_data = read_CIFAR10(batch_size, test_batch_size, 0.2)
 epoch_num = 20
 
 netD = _netD_cifar10()
 netD.cuda()
 loss_func = nn.CrossEntropyLoss()
 
-
+'''
 ##### Train netD on real data
 #optimizerD = optim.Adam(netD.parameters(), lr=lr_D, betas=(0.9, 0.999))
 optimizerD = optim.SGD(netD.parameters(), lr=0.02, weight_decay = 0.01)
@@ -51,32 +51,35 @@ for epoch in range(epoch_num):
       	running_loss / 100, running_acc/100))
       running_loss = .0
       running_acc = .0
-  print('Test accuracy of netD: %.3f'%(TestAcc_dataloader(netD,test_data)))
-  if epoch in {5,10,20,30}:
-    optimizerD.param_groups[0]['lr'] /= 2.0
+  print('Validation accuracy of netD: %.3f'%(TestAcc_dataloader(netD,valid_data, loss_func)[0]))
+  if epoch in {10,15}:
+    optimizerD.param_groups[0]['lr'] /= 10.0
   
 
 print('Finished Pre_train netD')
 torch.save(netD.state_dict(), './netD.pkl')
+print('Test accuracy of netD: %.3f'%(TestAcc_dataloader(netD,test_data, loss_func)[0]))
+
 '''
 netD.load_state_dict(torch.load('netD.pkl'))
-print('Test accuracy of netD: %.3f'%(TestAcc_dataloader(netD,test_data)))
+print('Test accuracy of netD: %.3f'%(TestAcc_dataloader(netD,test_data, loss_func)[0]))
 
 ######################
 ## gap base
 adv_list = []
 label_list = []
 flag = 'sign'
-step_num = 1
+step_num = 6
 path = "./adv_exam/"
-coef = 0.03
+coef = 0.003
+max_per = 0.01
 print('gradient', flag, coef, step_num)
 mag = .0
 
 for i,data_batch in enumerate(train_data):
   feature, label = data_batch
   feature_temp = feature[:].cuda()
-  perb_temp = advexam_gradient(netD, feature, label, flag, coef, step_num)
+  perb_temp = advexam_gradient(netD, feature, label, flag, coef, step_num, max_per)
   if flag == 2:
     mag += torch.norm((feature_temp-perb_temp).view(64,-1), 2, 1).mean()
   else:
@@ -88,12 +91,11 @@ for i,data_batch in enumerate(train_data):
 print(1.0*mag/i)
 adv_featureset = torch.cat(adv_list, 0)
 labelset = torch.cat(label_list, 0)
-res = TestAcc_tensor(netD,(adv_featureset, labelset))
+res = TestAcc_tensor(netD,(adv_featureset, labelset,loss_func)[0])
 print('Adv accuracy of netD: %.3f'%(res))
 
-if flag=='sign':
-  torch.save((adv_featureset, labelset), path+'adv_gradient_FGSM_step%d.pt'%(step_num))
-else:
-  torch.save((adv_featureset, labelset), path+'adv_gradient_L%d_step%d.pt'%(flag, step_num))
-'''
+#if flag=='sign':
+#  torch.save((adv_featureset, labelset), path+'adv_gradient_FGSM_step%d.pt'%(step_num))
+#else:
+#  torch.save((adv_featureset, labelset), path+'adv_gradient_L%d_step%d.pt'%(flag, step_num))
 

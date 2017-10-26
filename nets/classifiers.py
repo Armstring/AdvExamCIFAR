@@ -66,21 +66,21 @@ class _netD_cifar10(nn.Module):
         self.conv2b = nn.Conv2d(128, 128, 3, 1, 1)
         self.bn2 = nn.BatchNorm2d(128)
         self.pool2 = nn.MaxPool2d(2,2) #8*8
-        self.conv3a = nn.Conv2d(128, 128, 3, 1, 1)
-        self.conv3b = nn.Conv2d(128, 128, 3, 1, 1)
-        self.bn3 = nn.BatchNorm2d(128)
+        self.conv3a = nn.Conv2d(128, 256, 3, 1, 1)
+        self.conv3b = nn.Conv2d(256, 256, 3, 1, 1)
+        self.bn3 = nn.BatchNorm2d(256)
         self.pool3 = nn.MaxPool2d(2,2) #4*4
-        #self.conv4a = nn.Conv2d(256, 256, 3, 1, 1)
-        #self.conv4b = nn.Conv2d(256, 256, 3, 1, 1)
-        #self.bn4 = nn.BatchNorm2d(256)
-        #self.pool4 = nn.MaxPool2d(2,2) #2*2
+        self.conv4a = nn.Conv2d(256, 256, 3, 1, 1)
+        self.conv4b = nn.Conv2d(256, 256, 3, 1, 1)
+        self.bn4 = nn.BatchNorm2d(256)
+        self.pool4 = nn.MaxPool2d(2,2) #2*2
         #self.conv5a = nn.Conv2d(512, 512, 3, 1, 1)
         #self.conv5b = nn.Conv2d(512, 512, 3, 1, 1)
         #self.bn5 = nn.BatchNorm2d(512)
         #self.pool5 = nn.MaxPool2d(2,2) #1*1
 
         
-        self.linear1 = nn.Linear(2048,128)
+        self.linear1 = nn.Linear(1024,128)
         #self.fc_bn1 = nn.BatchNorm1d(64)
         #self.fc_drop1 = nn.Dropout(p=0.5)
         self.linear2 = nn.Linear(128,num_classes)
@@ -89,7 +89,7 @@ class _netD_cifar10(nn.Module):
         x = self.pool1(F.relu(self.bn1(self.conv1b(self.conv1a(input))), inplace=True))
         x = self.pool2(F.relu(self.bn2(self.conv2b(self.conv2a(x))), inplace=True))
         x = self.pool3(F.relu(self.bn3(self.conv3b(self.conv3a(x))), inplace=True))
-        #x = self.pool4(F.relu(self.bn4(self.conv4b(self.conv4a(x))), inplace=True))
+        x = self.pool4(F.relu(self.bn4(self.conv4b(self.conv4a(x))), inplace=True))
         #x = self.pool5(F.relu(self.bn5(self.conv5b(self.conv5a(x))), inplace=True))
         x = x.view(x.size()[0], -1)
         #x = self.fc_drop1(F.relu(self.fc_bn1(self.linear1(x)), inplace=True))
