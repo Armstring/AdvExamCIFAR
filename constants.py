@@ -17,7 +17,7 @@ ndf_netD = 256
 
 ####################################
 #training parameters
-epoch_num = 40
+epoch_num = 100
 lr_D = 0.001
 lr_G = 0.0005
 
@@ -26,7 +26,7 @@ batch_size = 64
 test_batch_size = 1000
 ###################################
 ###perturbation magnitude for training
-coef_FGSM = 0.03
+coef_FGSM = 0.01
 coef_L2 = 1.0
 
 coef_FGSM_gap = 0.3

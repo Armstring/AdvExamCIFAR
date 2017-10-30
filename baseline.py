@@ -17,10 +17,10 @@ from dataProcess.read_data import read_CIFAR10
 
 #torch.manual_seed(31415926)
 #torch.cuda.manual_seed(31415926)
-batch_size = 64
-test_batch_size = 1000
-train_data , valid_data, test_data = read_CIFAR10(batch_size, test_batch_size, 0.2)
-epoch_num = 20
+batch_size = 128
+test_batch_size = 128
+train_data , valid_data, test_data = read_CIFAR10(batch_size, test_batch_size, 0.2, False)
+epoch_num = 30
 
 netD = _netD_cifar10()
 netD.cuda()
@@ -52,8 +52,8 @@ for epoch in range(epoch_num):
       running_loss = .0
       running_acc = .0
   print('Validation accuracy of netD: %.3f'%(TestAcc_dataloader(netD,valid_data, loss_func)[0]))
-  if epoch in {10,15}:
-    optimizerD.param_groups[0]['lr'] /= 10.0
+  if epoch in {10,20}:
+    optimizerD.param_groups[0]['lr'] /= 4.0
   
 
 print('Finished Pre_train netD')
@@ -66,33 +66,48 @@ print('Test accuracy of netD: %.3f'%(TestAcc_dataloader(netD,test_data, loss_fun
 
 ######################
 ## gap base
-adv_list = []
-label_list = []
+
 flag = 'sign'
-step_num = 6
+step_num = 10
 path = "./adv_exam/"
-coef = 0.003
-max_per = 0.01
+coef = 0.005
+max_per = 0.03
 print('gradient', flag, coef, step_num)
-mag = .0
+loss_res = []
+acc_res = []
+perb_res = []
+num_trail=20
 
-for i,data_batch in enumerate(train_data):
-  feature, label = data_batch
-  feature_temp = feature[:].cuda()
-  perb_temp = advexam_gradient(netD, feature, label, flag, coef, step_num, max_per)
-  if flag == 2:
-    mag += torch.norm((feature_temp-perb_temp).view(64,-1), 2, 1).mean()
-  else:
-    mag += torch.max(torch.abs(feature_temp-perb_temp), 1)[0].mean()
+for j in range(num_trail):
+  mag = .0
+  adv_list = []
+  label_list = []
+  for i,data_batch in enumerate(train_data):
+    feature, label = data_batch
+    feature_temp = feature[:].cuda()
+    perb_temp = advexam_gradient(netD, feature, label, flag, coef, step_num, max_per)
+    if flag == 2:
+      mag += torch.norm((feature_temp-perb_temp).view(64,-1), 2, 1).mean()
+    else:
+      mag += torch.max(torch.abs(feature_temp-perb_temp), 1)[0].mean()
 
-  adv_list.append(perb_temp)
-  label_list.append(label)
+    adv_list.append(perb_temp)
+    label_list.append(label)
 
-print(1.0*mag/i)
-adv_featureset = torch.cat(adv_list, 0)
-labelset = torch.cat(label_list, 0)
-res = TestAcc_tensor(netD,(adv_featureset, labelset,loss_func)[0])
-print('Adv accuracy of netD: %.3f'%(res))
+  print(1.0*mag/i)
+  adv_featureset = torch.cat(adv_list, 0)
+  labelset = torch.cat(label_list, 0)
+  res = TestAcc_tensor(netD,(adv_featureset, labelset), loss_func)
+  print('Adv accuracy of netD: %.3f;\t %.5f'%(res[0], res[1]))
+  loss_res.append(res[1])
+  acc_res.append(res[0])
+
+
+print("====="*5)
+print(torch.mean(loss_res), torch.var(loss_res))
+print(torch.mean(acc_res), torch.var(acc_res))
+
+
 
 #if flag=='sign':
 #  torch.save((adv_featureset, labelset), path+'adv_gradient_FGSM_step%d.pt'%(step_num))

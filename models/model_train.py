@@ -15,9 +15,11 @@ import copy
 def infnorm(tensor):
 	return torch.max(torch.abs(tensor))
 
-def advexam_gradient(netD, feature, label, flag, coef, iter_num, mag):
-
-	perturb = torch.zeros(feature.size()).cuda()
+def advexam_gradient(netD, feature, label, flag, coef, iter_num, mag, perb0=None):
+	if perb0 is None:
+		perturb = torch.zeros(feature.size()).cuda()
+	else:
+		perturb = perb0
 	#perturb.normal_(0.0,0.0001)
 	feature, label = Variable(feature.cuda()), Variable(label.cuda())
 	perturb = Variable(perturb, requires_grad = True)

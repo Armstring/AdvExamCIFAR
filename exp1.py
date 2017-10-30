@@ -68,7 +68,13 @@ num_trial = 30
 res = np.zeros(num_trial)
 for j in range(num_trial):
 	print("Trial: %2d" %(j))
-	adv_per0 = np.zeros(image_batch.view(-1).size()[0])
+
+	gauss_noise = torch.zeros(image_batch.view(-1).size()[0]).cuda()
+	gauss_noise.normal_()
+	#adv_per0 = np.zeros(image_batch.view(-1).size()[0])
+	adv_per0 = 0.01*gauss_noise/torch.max(torch.abs(gauss_noise))
+	adv_per0 = adv_per0.cpu().numpy()
+
 	bound = [(-coef_FGSM,coef_FGSM)] * adv_per0.shape[0]
 	adv_per = fmin_l_bfgs_b(f,  adv_per0,  pgtol = 1e-12, bounds = bound, maxiter=15000, disp =None)
 	res[j] = adv_per[1]
