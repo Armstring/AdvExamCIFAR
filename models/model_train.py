@@ -15,6 +15,39 @@ import copy
 def infnorm(tensor):
 	return torch.max(torch.abs(tensor))
 
+def maxlogit_attack(netD, feature, flag, p_coef, iter_num, mag, perb0=None):
+	if perb0 is None:
+		perturb = torch.zeros(feature.size()).cuda()
+	else:
+		perturb = perb0
+	feature = Variable(feature.cuda())
+	perturb = Variable(perturb, requires_grad = True)
+	
+	netD.eval()
+	for i in range(iter_num):
+		perturb.data.clamp_(min=-mag, max =mag)
+		feature_adv = feature + perturb
+		feature_adv.data.clamp_(min=-1.0, max = 1.0)
+		outputs = netD(feature_adv)
+		error = .0
+		for j in range(outputs.size()[0]):
+			error -= torch.max(outputs[j])
+		error.backward()
+
+		for j,image in enumerate(feature):
+			if True:
+				if flag=='sign':
+					perturb.data[j] +=  p_coef*torch.sign(perturb.grad.data[j])
+				else:
+					duel_norm = flag/(flag-1.0)
+					perturb.data[j] += p_coef * perturb.grad.data[j]/torch.norm(perturb.grad[j].data, p = duel_norm)
+	
+	perturb.data.clamp_(min=-mag, max =mag)
+	feature_adv = feature + perturb
+	feature_adv.data.clamp_(min=-1.0, max = 1.0)
+	return feature_adv.data
+
+
 def advexam_gradient(netD, feature, label, flag, coef, iter_num, mag, perb0=None):
 	if perb0 is None:
 		perturb = torch.zeros(feature.size()).cuda()

@@ -17,7 +17,7 @@ ndf_netD = 256
 
 ####################################
 #training parameters
-epoch_num = 100
+epoch_num = 1000
 lr_D = 0.001
 lr_G = 0.0005
 

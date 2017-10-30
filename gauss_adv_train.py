@@ -16,9 +16,10 @@ import models.model_train as model_train
 from dataProcess.read_data import read_CIFAR10
 import glob
 import copy
+from vae import *
 #torch.manual_seed(31415926)
 #torch.cuda.manual_seed(31415926)
-batch_size = 128
+batch_size = 64
 test_batch_size = 128
 train_data , valid_data, test_data = read_CIFAR10(batch_size, test_batch_size, 0.2)
 attack_method = model_train.advexam_gradient
@@ -79,8 +80,6 @@ def acquireInputGradient(netD, dataset1, dataset2, loss_func):
 		num2 +=1
 	print("%3.5f \t %3.5f \t %3.5f \t %3.5f" %(res1/num1, res1_error/num1, res2/num2, res2_error/num2))
 	return
-
-
 
 netD = _netD_cifar10()
 netD.cuda()

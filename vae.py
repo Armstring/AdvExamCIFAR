@@ -10,6 +10,7 @@ from torchvision.utils import save_image
 
 from constants import *
 from dataProcess.read_data import read_CIFAR10
+from utils.utils import weights_init,weights_xavier_init
 
 batch_size = 64
 test_batch_size = 128
@@ -22,37 +23,42 @@ class VAE(nn.Module):
 
         self.conv1a = nn.Conv2d(num_channel, 32, 3, 1, 1)
         self.conv1b = nn.Conv2d(32, 32, 3, 1, 1)
+        self.bn1 = nn.BatchNorm2d(32)
         self.pool1 = nn.MaxPool2d(2) #16*16
         self.conv2a = nn.Conv2d(32, 64, 3, 1, 1)
         self.conv2b = nn.Conv2d(64, 64, 3, 1, 1)
+        self.bn2 = nn.BatchNorm2d(64)
         self.pool2 = nn.MaxPool2d(2) #8*8
         self.conv3a = nn.Conv2d(64, 128, 3, 1, 1)
         self.conv3b = nn.Conv2d(128, 128, 3, 1, 1)
+        self.bn3 = nn.BatchNorm2d(128)
         self.pool3 = nn.MaxPool2d(2) #4*4
-        self.fc1a = nn.Linear(128*16, 1024)
-        self.fc1b = nn.Linear(1024, h_dim)
-        self.fc2a = nn.Linear(128*16, 1024)
-        self.fc2b = nn.Linear(1024, h_dim)
+        self.fc1a = nn.Linear(128*16, h_dim)
+        #self.fc1b = nn.Linear(1024, h_dim)
+        self.fc2a = nn.Linear(128*16, h_dim)
+        #self.fc2b = nn.Linear(1024, h_dim)
 
 
         self.fc3 = nn.Linear(h_dim, 2048) #32*8*8
+        self.bn4 = nn.BatchNorm2d(32)
         self.upsample1 = nn.ConvTranspose2d(32, 32, 4, 2, 1) #32* 16*16
         self.conv4a = nn.Conv2d(32, 16, 3, 1, 1)
         self.conv4b = nn.Conv2d(16, 16, 3, 1, 1)
+        self.bn5 = nn.BatchNorm2d(16)
         self.upsample2 = nn.ConvTranspose2d(16, 16, 4, 2, 1) #16* 32*32
         self.conv5a = nn.Conv2d(16, 3, 3, 1, 1)
         self.conv5b = nn.Conv2d(3, 3, 3, 1, 1)
 
         self.relu = nn.ReLU()
         self.tanh = nn.Tanh()
-
+        self.apply(weights_xavier_init)
     def encode(self, x):
-        x = self.pool1(self.relu(self.conv1b(self.conv1a(x))))
-        x = self.pool2(self.relu(self.conv2b(self.conv2a(x))))
-        x = self.pool3(self.relu(self.conv3b(self.conv3a(x))))
+        x = self.pool1(self.relu(self.bn1(self.conv1b(self.conv1a(x)))))
+        x = self.pool2(self.relu(self.bn2(self.conv2b(self.conv2a(x)))))
+        x = self.pool3(self.relu(self.bn3(self.conv3b(self.conv3a(x)))))
         x = x.view(x.size()[0],-1)
-        h1 = self.fc1b(self.relu(self.fc1a(x)))
-        h2 = self.fc2b(self.relu(self.fc2a(x)))
+        h1 = self.fc1a(x)
+        h2 = self.fc2a(x)
         return h1,h2
 
     def reparameterize(self, mu, logvar):
@@ -64,10 +70,11 @@ class VAE(nn.Module):
           return mu
 
     def decode(self, z):
-        z = self.relu(self.fc3(z))
+        z = self.fc3(z)
         z = z.view(z.size()[0], -1, 8, 8)
+        z = self.relu(self.bn4(z))
         z = self.upsample1(z)
-        z = self.upsample2(self.relu(self.conv4b(self.conv4a(z))))
+        z = self.upsample2(self.relu(self.bn5(self.conv4b(self.conv4a(z)))))
         z = self.conv5b(self.conv5a(z))
         return self.tanh(z)
 
@@ -80,8 +87,10 @@ class VAE(nn.Module):
 model = VAE()
 model.cuda()
 pixelloss = nn.MSELoss()
+optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
-def loss_function(recon_x, x, mu, logvar):
+
+def vae_loss(recon_x, x, mu, logvar):
     BCE = pixelloss(recon_x.view(-1,num_channel*image_size), x.view(-1, num_channel*image_size))
 
     # see Appendix B from VAE paper:
@@ -92,10 +101,7 @@ def loss_function(recon_x, x, mu, logvar):
     # Normalise by same number of elements as in reconstruction
     KLD /= batch_size * num_channel*image_size
 
-    return BCE + KLD
-
-
-optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    return 2*BCE + KLD
 
 
 def train(epoch):
@@ -106,7 +112,7 @@ def train(epoch):
         data = data.cuda()
         optimizer.zero_grad()
         recon_batch, mu, logvar = model(data)
-        loss = loss_function(recon_batch, data, mu, logvar)
+        loss = vae_loss(recon_batch, data, mu, logvar)
         loss.backward()
         train_loss += loss.data[0]
         optimizer.step()
@@ -127,8 +133,8 @@ def test(epoch):
         data = data.cuda()
         data = Variable(data, volatile=True)
         recon_batch, mu, logvar = model(data)
-        test_loss += loss_function(recon_batch, data, mu, logvar).data[0]
-        if i == 0 and epoch%10==1:
+        test_loss += vae_loss(recon_batch, data, mu, logvar).data[0]
+        if i == 0 and epoch%50==1:
           n = min(data.size(0), 8)
           comparison = torch.cat([data[:n],
                                   recon_batch[:n]])
@@ -142,10 +148,17 @@ def test(epoch):
 for epoch in range(1, epoch_num + 1):
     train(epoch)
     test(epoch)
-    if epoch%10==1:
+    if epoch%50==1:
         sample = Variable(torch.randn(batch_size, h_dim))
         sample = sample.cuda()
         sample = model.decode(sample).cpu()
         save_image(sample.data,
                    'Vae_results/sample_' + str(epoch) + '.png',normalize = True)
+    if epoch % 200 ==0:
+        optimizer.param_groups[0]['lr'] /=2.0
+
+
+
+
+
 
