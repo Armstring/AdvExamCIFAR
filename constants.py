@@ -17,7 +17,7 @@ ndf_netD = 256
 
 ####################################
 #training parameters
-epoch_num = 1000
+epoch_num = 100
 lr_D = 0.001
 lr_G = 0.0005
 
@@ -36,3 +36,8 @@ coef_FGSM_ll = 0.3
 coef_L2_ll = 3.0
 
 coef_gan = 0.47
+
+
+##################################
+###Vae_adv_train
+h_dim = 256

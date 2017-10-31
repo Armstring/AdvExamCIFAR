@@ -19,13 +19,10 @@ import copy
 from vae import *
 #torch.manual_seed(31415926)
 #torch.cuda.manual_seed(31415926)
-batch_size = 64
+batch_size = 128
 test_batch_size = 128
 train_data , valid_data, test_data = read_CIFAR10(batch_size, test_batch_size, 0.2)
 attack_method = model_train.advexam_gradient
-h_dim = 100
-
-
 
 def acquireInputGradient(netD, dataset1, dataset2, loss_func):
 	netD.eval()
@@ -84,15 +81,58 @@ def acquireInputGradient(netD, dataset1, dataset2, loss_func):
 
 model = VAE()
 model.cuda()
-epoch_num=400
+epoch_num=20
+
+def train(epoch):
+    model.train()
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    train_loss = 0
+    for batch_idx, (data, _) in enumerate(train_data):
+        data = Variable(data)
+        data = data.cuda()
+        optimizer.zero_grad()
+        recon_batch, mu, logvar = model(data)
+        loss = vae_loss(recon_batch, data, mu, logvar)
+        loss.backward()
+        train_loss += loss.data[0]
+        optimizer.step()
+        if batch_idx %100  == 0:
+            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                epoch, batch_idx * len(data), len(train_data.dataset),
+                100. * batch_idx / len(train_data),
+                loss.data[0] / len(data)))
+
+    print('====> Epoch: {} Average loss: {:.4f}'.format(
+          epoch, train_loss / len(train_data.dataset)))
+
+
+def test(epoch):
+    model.eval()
+    test_loss = 0
+    for i, (data, _) in enumerate(test_data):
+        data = data.cuda()
+        data = Variable(data, volatile=True)
+        recon_batch, mu, logvar = model(data)
+        test_loss += vae_loss(recon_batch, data, mu, logvar).data[0]
+        if i == 0 and epoch%10==1:
+          n = min(data.size(0), 8)
+          comparison = torch.cat([data[:n],
+                                  recon_batch[:n]])
+          save_image(comparison.data.cpu(),
+                     'Vae_results/reconstruction_' + str(epoch) + '.png', normalize = True, nrow=n)
+
+    test_loss /= len(test_data.dataset)
+    print('====> Test set loss: {:.4f}'.format(test_loss))
+
+
 for epoch in range(1, epoch_num + 1):
 	train(epoch)
 	test(epoch)
 	if epoch%10==1:
-		sample = Variable(torch.randn(batch_size, h_dim))
-		sample = sample.cuda()
-		sample = model.decode(sample).cpu()
-		save_image(sample.data,
+		sample_z = Variable(torch.zeros(64, h_dim)).cuda()
+		sample_z.data.normal_()
+		sample = model.decode(sample_z)
+		save_image(sample.data.cpu(),
 			'Vae_results/sample_' + str(epoch) + '.png',normalize = True)
 
 model.eval()
@@ -108,7 +148,7 @@ def max_loss(output):
 	val,label = torch.max(output,1)
 	return loss_func(output,label)
 
-sample = Variable(torch.randn(batch_size, h_dim)).cuda()
+sample_z = Variable(torch.zeros((64, h_dim)).cuda())
 for epoch in range(epoch_num):
 	running_loss_D = .0
 	running_acc_D = .0
@@ -121,8 +161,9 @@ for epoch in range(epoch_num):
 		feature = feature.cuda()
 		label = label.cuda()
 
-		sample.data.normal_()
-		sample = model.decode(sample)
+		sample_z.data.normal_()
+		#sample = Variable(torch.randn(batch_size, h_dim)).cuda()
+		sample = model.decode(sample_z)
 		feature_vae = sample.data
 
 
@@ -141,12 +182,12 @@ for epoch in range(epoch_num):
 		outputs_vae= netD(feature_vae)
 		error_vae = max_loss(outputs_vae)
 
-		error_tr = error_vae_adv - error_vae + error
+		error_tr = 0.5*(error_vae_adv - error_vae) + error
 		error_tr.backward()
 		optimizerD.step()
 
 		running_loss_D += error
-		running_loss_reg += error_vae_adv - error_vae
+		running_loss_reg += 0.5*(error_vae_adv - error_vae)
 		running_acc_D += accu(outputs, label)/batch_size
 
 		if i%100==99:

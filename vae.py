@@ -12,11 +12,6 @@ from constants import *
 from dataProcess.read_data import read_CIFAR10
 from utils.utils import weights_init,weights_xavier_init
 
-batch_size = 64
-test_batch_size = 128
-h_dim = 100
-train_loader , valid_loader, test_loader = read_CIFAR10(batch_size, test_batch_size, 0.2)
-
 class VAE(nn.Module):
     def __init__(self):
         super(VAE, self).__init__()
@@ -39,13 +34,13 @@ class VAE(nn.Module):
         #self.fc2b = nn.Linear(1024, h_dim)
 
 
-        self.fc3 = nn.Linear(h_dim, 2048) #32*8*8
-        self.bn4 = nn.BatchNorm2d(32)
-        self.upsample1 = nn.ConvTranspose2d(32, 32, 4, 2, 1) #32* 16*16
-        self.conv4a = nn.Conv2d(32, 16, 3, 1, 1)
-        self.conv4b = nn.Conv2d(16, 16, 3, 1, 1)
-        self.bn5 = nn.BatchNorm2d(16)
-        self.upsample2 = nn.ConvTranspose2d(16, 16, 4, 2, 1) #16* 32*32
+        self.fc3 = nn.Linear(h_dim, 4096) #64*8*8
+        self.bn4 = nn.BatchNorm2d(64)
+        self.upsample1 = nn.ConvTranspose2d(64, 64, 4, 2, 1) #32* 16*16
+        self.conv4a = nn.Conv2d(64, 32, 3, 1, 1)
+        self.conv4b = nn.Conv2d(32, 32, 3, 1, 1)
+        self.bn5 = nn.BatchNorm2d(32)
+        self.upsample2 = nn.ConvTranspose2d(32, 16, 4, 2, 1) #16* 32*32
         self.conv5a = nn.Conv2d(16, 3, 3, 1, 1)
         self.conv5b = nn.Conv2d(3, 3, 3, 1, 1)
 
@@ -83,15 +78,11 @@ class VAE(nn.Module):
         z = self.reparameterize(mu, logvar)
         return self.decode(z), mu, logvar
 
-
-model = VAE()
-model.cuda()
-pixelloss = nn.MSELoss()
-optimizer = optim.Adam(model.parameters(), lr=1e-3)
-
-
 def vae_loss(recon_x, x, mu, logvar):
-    BCE = pixelloss(recon_x.view(-1,num_channel*image_size), x.view(-1, num_channel*image_size))
+    sampleloss = nn.BCELoss()
+    pixelloss = nn.MSELoss()
+    BCE = sampleloss((1.0+recon_x.view(-1,num_channel*image_size))/2.0, (1.0+x.view(-1, num_channel*image_size))/2.0)
+    MSE = pixelloss(recon_x.view(-1,num_channel*image_size), x.view(-1, num_channel*image_size))
 
     # see Appendix B from VAE paper:
     # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
@@ -101,11 +92,12 @@ def vae_loss(recon_x, x, mu, logvar):
     # Normalise by same number of elements as in reconstruction
     KLD /= batch_size * num_channel*image_size
 
-    return 2*BCE + KLD
+    return BCE + KLD + MSE
 
 
 def train(epoch):
     model.train()
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
     train_loss = 0
     for batch_idx, (data, _) in enumerate(train_loader):
         data = Variable(data)
@@ -134,7 +126,7 @@ def test(epoch):
         data = Variable(data, volatile=True)
         recon_batch, mu, logvar = model(data)
         test_loss += vae_loss(recon_batch, data, mu, logvar).data[0]
-        if i == 0 and epoch%50==1:
+        if i == 0 and epoch%10==1:
           n = min(data.size(0), 8)
           comparison = torch.cat([data[:n],
                                   recon_batch[:n]])
@@ -144,18 +136,23 @@ def test(epoch):
     test_loss /= len(test_loader.dataset)
     print('====> Test set loss: {:.4f}'.format(test_loss))
 
+if __name__ == "__main__":
+    batch_size = 128
+    test_batch_size = 128
+    train_loader , valid_loader, test_loader = read_CIFAR10(batch_size, test_batch_size, 0.2)
 
-for epoch in range(1, epoch_num + 1):
-    train(epoch)
-    test(epoch)
-    if epoch%50==1:
-        sample = Variable(torch.randn(batch_size, h_dim))
-        sample = sample.cuda()
-        sample = model.decode(sample).cpu()
-        save_image(sample.data,
-                   'Vae_results/sample_' + str(epoch) + '.png',normalize = True)
-    if epoch % 200 ==0:
-        optimizer.param_groups[0]['lr'] /=2.0
+    model = VAE()
+    model.cuda()
+    for epoch in range(1, epoch_num + 1):
+        train(epoch)
+        test(epoch)
+        if epoch%10==1:
+            sample = Variable(torch.randn(64, h_dim))
+            sample = sample.cuda()
+            sample = model.decode(sample).cpu()
+            save_image(sample.data,
+                       'Vae_results/sample_' + str(epoch) + '.png',normalize = True)
+
 
 
 
