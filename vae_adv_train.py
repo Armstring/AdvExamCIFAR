@@ -81,7 +81,7 @@ def acquireInputGradient(netD, dataset1, dataset2, loss_func):
 
 model = VAE()
 model.cuda()
-epoch_num=20
+epoch_num=75
 
 def train(epoch):
     model.train()
@@ -136,7 +136,6 @@ for epoch in range(1, epoch_num + 1):
 			'Vae_results/sample_' + str(epoch) + '.png',normalize = True)
 
 model.eval()
-
 netD = _netD_cifar10()
 netD.cuda()
 loss_func = nn.CrossEntropyLoss()
@@ -144,18 +143,17 @@ optimizerD = optim.SGD(netD.parameters(), lr=0.01, weight_decay = 0.0002)
 epoch_num = 70
 
 
-def max_loss(output):
-	val,label = torch.max(output,1)
-	return loss_func(output,label)
-
 sample_z = Variable(torch.zeros((64, h_dim)).cuda())
+lam = 1.0
 for epoch in range(epoch_num):
 	running_loss_D = .0
 	running_acc_D = .0
 	running_loss_reg = .0
+	if epoch%20 ==0:
+		lam = lam/2.0
+		print("Seeting lambda to be %.3f" %(lam))
 	for i, data_batch in enumerate(train_data):
 		netD.train()
-
 		netD.zero_grad()
 		feature,label = data_batch
 		feature = feature.cuda()
@@ -163,31 +161,31 @@ for epoch in range(epoch_num):
 
 		sample_z.data.normal_()
 		#sample = Variable(torch.randn(batch_size, h_dim)).cuda()
-		sample = model.decode(sample_z)
-		feature_vae = sample.data
-
-
+		feature_vae = model.decode(sample_z)
 		netD_cp = copy.deepcopy(netD)
-		feature_vae_adv = model_train.maxlogit_attack(netD_cp, feature_vae, 'sign', 0.001, 7, 0.005)
+		feature_vae_adv = model_train.maxlogit_attack(netD_cp, feature_vae.data, 'sign', 0.001, 7, 0.005)
 		
-		feature_vae_adv, label = Variable(feature_vae_adv), Variable(label.cuda())	
-		feature, feature_vae = Variable(feature), Variable(feature_vae)
 
+		outputs_vae= netD(feature_vae.detach())
+		_,label_vae = torch.max(outputs_vae.data,1)
+
+
+		feature, feature_vae_adv = Variable(feature), Variable(feature_vae_adv)
+		label, label_vae = Variable(label.cuda()), Variable(label_vae.cuda())	
+		
+		#error_vae = loss_func(outputs_vae, label_vae)
+		
 		outputs_vae_adv = netD(feature_vae_adv.detach())
-		error_vae_adv = max_loss(outputs_vae_adv)
-
+		error_vae_adv = loss_func(outputs_vae_adv, label_vae)
 		outputs= netD(feature)
 		error = loss_func(outputs, label)
 
-		outputs_vae= netD(feature_vae)
-		error_vae = max_loss(outputs_vae)
-
-		error_tr = 0.5*(error_vae_adv - error_vae) + error
+		error_tr = lam*error_vae_adv + error
 		error_tr.backward()
 		optimizerD.step()
 
 		running_loss_D += error
-		running_loss_reg += 0.5*(error_vae_adv - error_vae)
+		running_loss_reg += error_vae_adv 
 		running_acc_D += accu(outputs, label)/batch_size
 
 		if i%100==99:

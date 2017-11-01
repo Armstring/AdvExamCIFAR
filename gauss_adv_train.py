@@ -19,7 +19,7 @@ import copy
 from vae import *
 #torch.manual_seed(31415926)
 #torch.cuda.manual_seed(31415926)
-batch_size = 64
+batch_size = 128
 test_batch_size = 128
 train_data , valid_data, test_data = read_CIFAR10(batch_size, test_batch_size, 0.2)
 attack_method = model_train.advexam_gradient
@@ -110,18 +110,18 @@ for epoch in range(epoch_num):
 		outputs_gau_adv = netD(feature_gau_adv.detach())
 		error_gau_adv = loss_func(outputs_gau_adv, label)
 
-		#feature, feature_gau = Variable(feature), Variable(feature_gau)
-		#outputs= netD(feature)
+		feature, feature_gau = Variable(feature), Variable(feature_gau)
+		outputs= netD(feature)
 		#outputs_gau= netD(feature_gau)
-		#error = loss_func(outputs, label)
+		error = loss_func(outputs, label)
 		#error_gau = loss_func(outputs_gau, label)
 
-		error_tr = error_gau_adv# - error_gau + error
+		error_tr = torch.abs(error_gau_adv - error) + error
 		error_tr.backward()
 		optimizerD.step()
 
-		running_loss_D += error_gau_adv
-		running_acc_D += accu(outputs_gau_adv, label)/batch_size
+		running_loss_D += error
+		running_acc_D += accu(outputs, label)/batch_size
 
 		if i%100==99:
 			print('[%d/%d][%d/%d] Adv perf: %.4f / %.4f'

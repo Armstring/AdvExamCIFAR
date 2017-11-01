@@ -34,15 +34,16 @@ class VAE(nn.Module):
         #self.fc2b = nn.Linear(1024, h_dim)
 
 
-        self.fc3 = nn.Linear(h_dim, 4096) #64*8*8
-        self.bn4 = nn.BatchNorm2d(64)
-        self.upsample1 = nn.ConvTranspose2d(64, 64, 4, 2, 1) #32* 16*16
-        self.conv4a = nn.Conv2d(64, 32, 3, 1, 1)
-        self.conv4b = nn.Conv2d(32, 32, 3, 1, 1)
-        self.bn5 = nn.BatchNorm2d(32)
-        self.upsample2 = nn.ConvTranspose2d(32, 16, 4, 2, 1) #16* 32*32
-        self.conv5a = nn.Conv2d(16, 3, 3, 1, 1)
-        self.conv5b = nn.Conv2d(3, 3, 3, 1, 1)
+        self.fc3 = nn.Linear(h_dim, 256*8*8) #8*8
+        self.bn4 = nn.BatchNorm2d(256)
+        self.deconv4a = nn.ConvTranspose2d(256, 256, 4, 2, 1) #16*16
+        self.deconv4b = nn.ConvTranspose2d(256, 128, 3, 1, 1)
+        self.bn5 = nn.BatchNorm2d(128)
+        self.deconv5a = nn.ConvTranspose2d(128, 128, 3, 1, 1)
+        self.deconv5b = nn.ConvTranspose2d(128, 32, 4, 2, 1) #32*32
+        self.bn6 = nn.BatchNorm2d(32)
+        self.deconv6a = nn.ConvTranspose2d(32, 32, 3, 1, 1)
+        self.deconv6b = nn.ConvTranspose2d(32, 3, 3, 1, 1)
 
         self.relu = nn.ReLU()
         self.tanh = nn.Tanh()
@@ -68,9 +69,10 @@ class VAE(nn.Module):
         z = self.fc3(z)
         z = z.view(z.size()[0], -1, 8, 8)
         z = self.relu(self.bn4(z))
-        z = self.upsample1(z)
-        z = self.upsample2(self.relu(self.bn5(self.conv4b(self.conv4a(z)))))
-        z = self.conv5b(self.conv5a(z))
+        z = self.relu(self.bn5(self.deconv4b(self.deconv4a(z))))
+        z = self.relu(self.bn6(self.deconv5b(self.deconv5a(z))))
+        
+        z = self.deconv6b(self.deconv6a(z))
         return self.tanh(z)
 
     def forward(self, x):
@@ -81,7 +83,7 @@ class VAE(nn.Module):
 def vae_loss(recon_x, x, mu, logvar):
     sampleloss = nn.BCELoss()
     pixelloss = nn.MSELoss()
-    BCE = sampleloss((1.0+recon_x.view(-1,num_channel*image_size))/2.0, (1.0+x.view(-1, num_channel*image_size))/2.0)
+    #BCE = sampleloss((1.0+recon_x.view(-1,num_channel*image_size))/2.0, (1.0+x.view(-1, num_channel*image_size))/2.0)
     MSE = pixelloss(recon_x.view(-1,num_channel*image_size), x.view(-1, num_channel*image_size))
 
     # see Appendix B from VAE paper:
@@ -92,7 +94,7 @@ def vae_loss(recon_x, x, mu, logvar):
     # Normalise by same number of elements as in reconstruction
     KLD /= batch_size * num_channel*image_size
 
-    return BCE + KLD + MSE
+    return KLD + MSE
 
 
 def train(epoch):
