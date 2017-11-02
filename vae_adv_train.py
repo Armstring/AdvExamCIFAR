@@ -16,7 +16,7 @@ import models.model_train as model_train
 from dataProcess.read_data import read_CIFAR10
 import glob
 import copy
-from vae import *
+from vae import VAE
 #torch.manual_seed(31415926)
 #torch.cuda.manual_seed(31415926)
 batch_size = 128
@@ -81,8 +81,12 @@ def acquireInputGradient(netD, dataset1, dataset2, loss_func):
 
 model = VAE()
 model.cuda()
-epoch_num=75
+model.load_state_dict(torch.load('./vae_model.pkl'))
+sample = Variable(torch.randn(64,h_dim)).cuda()
+sample = model.decode(sample).cpu()
+save_image(sample.data, 'vae_test_image.png', normalize = True)
 
+'''
 def train(epoch):
     model.train()
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
@@ -134,7 +138,7 @@ for epoch in range(1, epoch_num + 1):
 		sample = model.decode(sample_z)
 		save_image(sample.data.cpu(),
 			'Vae_results/sample_' + str(epoch) + '.png',normalize = True)
-
+'''
 model.eval()
 netD = _netD_cifar10()
 netD.cuda()
@@ -185,7 +189,7 @@ for epoch in range(epoch_num):
 		optimizerD.step()
 
 		running_loss_D += error
-		running_loss_reg += error_vae_adv 
+		running_loss_reg += lam*error_vae_adv 
 		running_acc_D += accu(outputs, label)/batch_size
 
 		if i%100==99:

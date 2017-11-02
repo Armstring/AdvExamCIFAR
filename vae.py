@@ -145,6 +145,7 @@ if __name__ == "__main__":
 
     model = VAE()
     model.cuda()
+    
     for epoch in range(1, epoch_num + 1):
         train(epoch)
         test(epoch)
@@ -154,8 +155,13 @@ if __name__ == "__main__":
             sample = model.decode(sample).cpu()
             save_image(sample.data,
                        'Vae_results/sample_' + str(epoch) + '.png',normalize = True)
-
-
+    torch.save(model.state_dict(), './vae_model.pkl')
+    
+    model.load_state_dict(torch.load('./vae_model.pkl'))
+    sample = Variable(torch.randn(64,h_dim)).cuda()
+    sample = model.decode(sample).cpu()
+    save_image(sample.data, 'vae_test_image.png', normalize = True)
+    
 
 
 
