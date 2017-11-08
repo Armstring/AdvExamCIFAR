@@ -139,8 +139,6 @@ def test(epoch):
     print('====> Test set loss: {:.4f}'.format(test_loss))
 
 if __name__ == "__main__":
-    batch_size = 128
-    test_batch_size = 128
     train_loader , valid_loader, test_loader = read_CIFAR10(batch_size, test_batch_size, 0.2)
 
     model = VAE()

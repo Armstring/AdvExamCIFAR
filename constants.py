@@ -22,8 +22,8 @@ lr_D = 0.001
 lr_G = 0.0005
 
 
-batch_size = 64
-test_batch_size = 1000
+batch_size = 128
+test_batch_size = 128
 ###################################
 ###perturbation magnitude for training
 coef_FGSM = 0.01

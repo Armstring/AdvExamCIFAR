@@ -19,8 +19,7 @@ import copy
 from vae import VAE
 #torch.manual_seed(31415926)
 #torch.cuda.manual_seed(31415926)
-batch_size = 128
-test_batch_size = 128
+
 train_data , valid_data, test_data = read_CIFAR10(batch_size, test_batch_size, 0.2)
 attack_method = model_train.advexam_gradient
 
@@ -84,7 +83,7 @@ model.cuda()
 model.load_state_dict(torch.load('./vae_model.pkl'))
 sample = Variable(torch.randn(64,h_dim)).cuda()
 sample = model.decode(sample).cpu()
-save_image(sample.data, 'vae_test_image.png', normalize = True)
+vutils.save_image(sample.data, 'Vae_results/vae_test_image.png', normalize = True)
 
 '''
 def train(epoch):
@@ -143,46 +142,43 @@ model.eval()
 netD = _netD_cifar10()
 netD.cuda()
 loss_func = nn.CrossEntropyLoss()
-optimizerD = optim.SGD(netD.parameters(), lr=0.01, weight_decay = 0.0002)
+optimizerD = optim.SGD(netD.parameters(), lr=0.002, weight_decay = 0.0002)
 epoch_num = 70
 
 
 sample_z = Variable(torch.zeros((64, h_dim)).cuda())
-lam = 1.0
+lam = 0.5
 for epoch in range(epoch_num):
+	print("Seeting lambda to be %.3f" %(lam))
 	running_loss_D = .0
 	running_acc_D = .0
 	running_loss_reg = .0
-	if epoch%20 ==0:
-		lam = lam/2.0
-		print("Seeting lambda to be %.3f" %(lam))
 	for i, data_batch in enumerate(train_data):
 		netD.train()
 		netD.zero_grad()
 		feature,label = data_batch
-		feature = feature.cuda()
-		label = label.cuda()
+		feature, label = feature.cuda(), label.cuda()
+		netD_cp = copy.deepcopy(netD)
+		feature_adv = attack_method(netD_cp, feature, label, 'sign', 0.001, 7, 0.005)
+		feature_adv, label = Variable(feature_adv), Variable(label)
+		outputs_adv= netD(feature_adv)
+		error = loss_func(outputs_adv, label)
+
 
 		sample_z.data.normal_()
-		#sample = Variable(torch.randn(batch_size, h_dim)).cuda()
 		feature_vae = model.decode(sample_z)
-		netD_cp = copy.deepcopy(netD)
-		feature_vae_adv = model_train.maxlogit_attack(netD_cp, feature_vae.data, 'sign', 0.001, 7, 0.005)
-		
-
-		outputs_vae= netD(feature_vae.detach())
+		vutils.save_image(feature_vae.data, 'Vae_results/vae_test_image.png', normalize = True)
+		feature_vae = Variable(feature_vae.data)
+		outputs_vae= netD(feature_vae)
 		_,label_vae = torch.max(outputs_vae.data,1)
 
-
-		feature, feature_vae_adv = Variable(feature), Variable(feature_vae_adv)
-		label, label_vae = Variable(label.cuda()), Variable(label_vae.cuda())	
-		
+		netD_cp = copy.deepcopy(netD)
+		feature_vae_adv = attack_method(netD_cp, feature_vae.data, label_vae, 'sign', 0.001, 7, 0.005)
+		feature_vae_adv, label_vae = Variable(feature_vae_adv), Variable(label_vae.cuda())
 		#error_vae = loss_func(outputs_vae, label_vae)
-		
-		outputs_vae_adv = netD(feature_vae_adv.detach())
+		outputs_vae_adv = netD(feature_vae_adv)
 		error_vae_adv = loss_func(outputs_vae_adv, label_vae)
-		outputs= netD(feature)
-		error = loss_func(outputs, label)
+		
 
 		error_tr = lam*error_vae_adv + error
 		error_tr.backward()
@@ -190,7 +186,7 @@ for epoch in range(epoch_num):
 
 		running_loss_D += error
 		running_loss_reg += lam*error_vae_adv 
-		running_acc_D += accu(outputs, label)/batch_size
+		running_acc_D += accu(outputs_adv, label)/batch_size
 
 		if i%100==99:
 			print('[%d/%d][%d/%d] Adv perf: %.4f / %.4f / %.4f'
@@ -204,6 +200,7 @@ for epoch in range(epoch_num):
 			#vutils.save_image(feature.data, './adv_image/adv_image_epoch_%03d_%03d_orig.png' %(epoch,i), normalize = True)
 	if epoch in {20,35,50, 65}:
 		optimizerD.param_groups[0]['lr'] /= 2.0
+		lam = lam/5.0
 				#coef_FGSM *= 1.5
 	if epoch % 5 == 0:
 		#dataset_adv = torch.load('./adv_exam/adv_gradient_FGSM_step1.pt')
