@@ -73,6 +73,7 @@ path = "./adv_exam/"
 coef = 0.005
 max_per = 0.03
 print('gradient', flag, coef, step_num)
+
 loss_res = []
 acc_res = []
 perb_res = []
@@ -106,7 +107,6 @@ for j in range(num_trail):
 print("====="*5)
 print(torch.mean(loss_res), torch.var(loss_res))
 print(torch.mean(acc_res), torch.var(acc_res))
-
 
 
 #if flag=='sign':
