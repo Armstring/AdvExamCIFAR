@@ -64,7 +64,7 @@ class _netD_cifar10(nn.Module):
         self.pool1 = nn.MaxPool2d(2,2) #16*16
         self.conv2a = nn.Conv2d(64, 128, 3, 1, 1)
         self.conv2b = nn.Conv2d(128, 128, 3, 1, 1)
-        self.bn2 = nn.BatchNorm2d(128)
+        self.bn2 = nn.BatchNorm2d(32)
         self.pool2 = nn.MaxPool2d(2,2) #8*8
         self.conv3a = nn.Conv2d(128, 256, 3, 1, 1)
         self.conv3b = nn.Conv2d(256, 256, 3, 1, 1)

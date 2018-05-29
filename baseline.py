@@ -26,7 +26,7 @@ netD = _netD_cifar10()
 netD.cuda()
 loss_func = nn.CrossEntropyLoss()
 
-'''
+
 ##### Train netD on real data
 #optimizerD = optim.Adam(netD.parameters(), lr=lr_D, betas=(0.9, 0.999))
 optimizerD = optim.SGD(netD.parameters(), lr=0.02, weight_decay = 0.01)
@@ -60,13 +60,13 @@ print('Finished Pre_train netD')
 torch.save(netD.state_dict(), './netD.pkl')
 print('Test accuracy of netD: %.3f'%(TestAcc_dataloader(netD,test_data, loss_func)[0]))
 
-'''
+
 netD.load_state_dict(torch.load('netD.pkl'))
 print('Test accuracy of netD: %.3f'%(TestAcc_dataloader(netD,test_data, loss_func)[0]))
 
 ######################
 ## gap base
-
+'''
 flag = 'sign'
 step_num = 10
 path = "./adv_exam/"
@@ -107,7 +107,7 @@ for j in range(num_trail):
 print("====="*5)
 print(torch.mean(loss_res), torch.var(loss_res))
 print(torch.mean(acc_res), torch.var(acc_res))
-
+'''
 
 #if flag=='sign':
 #  torch.save((adv_featureset, labelset), path+'adv_gradient_FGSM_step%d.pt'%(step_num))
